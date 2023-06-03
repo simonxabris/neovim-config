@@ -20,3 +20,15 @@ vim.opt.shortmess:append("c")
 
 vim.g.mapleader = " "
 
+-- Sync clipboard between OS nad neovim
+vim.o.clipboard = 'unnamedplus';
+
+-- Keep signcolumn on by default
+vim.wo.signcolumn = 'yes'
+
+-- Set completeopt to have a better completion experience
+vim.o.completeopt = 'menuone,noselect'
+
+-- NOTE: You should make sure your terminal supports this
+vim.o.termguicolors = true
+
