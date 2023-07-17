@@ -107,8 +107,10 @@ require('lazy').setup({
     },
   },
 
+  { 'wakatime/vim-wakatime' },
+
   -- Useful plugin to show you pending keybinds.
-  { 'folke/which-key.nvim',          opts = {} },
+  { 'folke/which-key.nvim', opts = {} },
   {
     -- Adds git releated signs to the gutter, as well as utilities for managing changes
     'lewis6991/gitsigns.nvim',
