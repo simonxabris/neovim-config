@@ -317,7 +317,7 @@ require("lazy").setup({
 	{ -- Fuzzy Finder (files, lsp, etc)
 		"nvim-telescope/telescope.nvim",
 		event = "VimEnter",
-		branch = "0.1.x",
+		-- Use latest Telescope; 0.1.x calls removed nvim-treesitter APIs like ft_to_lang.
 		dependencies = {
 			"nvim-lua/plenary.nvim",
 			{ -- If encountering errors, see telescope-fzf-native README for installation instructions
@@ -386,11 +386,7 @@ require("lazy").setup({
 			vim.keymap.set("n", "<leader>sh", builtin.help_tags, { desc = "[S]earch [H]elp" })
 			vim.keymap.set("n", "<leader>sk", builtin.keymaps, { desc = "[S]earch [K]eymaps" })
 			vim.keymap.set("n", "<leader>sf", builtin.find_files, { desc = "[S]earch [F]iles" })
-			vim.keymap.set("n", "<leader>gf", builtin.git_files, { desc = "[G]it [F]iles" })
 			vim.keymap.set("n", "<leader>ss", builtin.builtin, { desc = "[S]earch [S]elect Telescope" })
-			vim.keymap.set("n", "<leader>sw", builtin.grep_string, { desc = "[S]earch current [W]ord" })
-			vim.keymap.set("n", "<leader>sg", builtin.live_grep, { desc = "[S]earch by [G]rep" })
-			vim.keymap.set("n", "<leader>sd", builtin.diagnostics, { desc = "[S]earch [D]iagnostics" })
 			vim.keymap.set("n", "<leader>sr", builtin.resume, { desc = "[S]earch [R]esume" })
 			vim.keymap.set("n", "<leader>s.", builtin.oldfiles, { desc = '[S]earch Recent Files ("." for repeat)' })
 			vim.keymap.set("n", "<leader><leader>", builtin.buffers, { desc = "[ ] Find existing buffers" })
@@ -494,10 +490,6 @@ require("lazy").setup({
 					--  Useful when you're not sure what type a variable is and you want to see
 					--  the definition of its *type*, not where it was *defined*.
 					map("<leader>D", require("telescope.builtin").lsp_type_definitions, "Type [D]efinition")
-
-					-- Fuzzy find all the symbols in your current document.
-					--  Symbols are things like variables, functions, types, etc.
-					map("<leader>ds", require("telescope.builtin").lsp_document_symbols, "[D]ocument [S]ymbols")
 
 					-- Fuzzy find all the symbols in your current workspace.
 					--  Similar to document symbols, except searches over your entire project.
@@ -674,9 +666,9 @@ require("lazy").setup({
 				--
 				-- You can use a sub-list to tell conform to run *until* a formatter
 				-- is found.
-				javascript = { { "prettier", "biome" } },
-				typescript = { { "prettier", "biome" } },
-				json = { { "prettier", "biome" } },
+				javascript = { "prettier" },
+				typescript = { "prettier" },
+				json = { "prettier" },
 			},
 		},
 	},
@@ -858,27 +850,112 @@ require("lazy").setup({
 	},
 	{ -- Highlight, edit, and navigate code
 		"nvim-treesitter/nvim-treesitter",
+		branch = "main",
 		build = ":TSUpdate",
-		opts = {
-			ensure_installed = { "bash", "c", "html", "lua", "luadoc", "markdown", "vim", "vimdoc", "typescript" },
-			-- Autoinstall languages that are not installed
-			auto_install = true,
-			highlight = {
-				enable = true,
-				-- Some languages depend on vim's regex highlighting system (such as Ruby) for indent rules.
-				--  If you are experiencing weird indenting issues, add the language to
-				--  the list of additional_vim_regex_highlighting and disabled languages for indent.
-				additional_vim_regex_highlighting = { "ruby" },
-			},
-			indent = { enable = true, disable = { "ruby" } },
-		},
-		config = function(_, opts)
+		-- dependencies = {
+		-- 	-- MoonBit parser and queries are not bundled with nvim-treesitter.
+		-- 	-- The repo stores queries at queries/*.scm, but nvim-treesitter looks
+		-- 	-- for queries/<lang>/*.scm, so symlink them into the config dir.
+		-- 	{
+		-- 		"moonbitlang/tree-sitter-moonbit",
+		-- 		config = function()
+		-- 			local source_dir = vim.fn.stdpath("data") .. "/lazy/tree-sitter-moonbit/queries"
+		-- 			local target_dir = vim.fn.stdpath("config") .. "/queries/moonbit"
+		-- 			if vim.fn.isdirectory(source_dir) == 1 and vim.fn.isdirectory(target_dir) == 0 then
+		-- 				vim.fn.mkdir(vim.fn.stdpath("config") .. "/queries", "p")
+		-- 				vim.fn.system({ "ln", "-s", source_dir, target_dir })
+		-- 			end
+		-- 		end,
+		-- 	},
+		-- },
+		config = function()
 			-- [[ Configure Treesitter ]] See `:help nvim-treesitter`
+			local treesitter = require("nvim-treesitter")
+			local ensure_installed = {
+				"bash",
+				"c",
+				"html",
+				"javascript",
+				"jsx",
+				"lua",
+				"luadoc",
+				"markdown",
+				"tsx",
+				"typescript",
+				"vim",
+				"vimdoc",
+			}
+			-- local ensure_installed = { "bash", "c", "html", "javascript", "jsx", "lua", "luadoc", "markdown", "tsx", "typescript", "vim", "vimdoc", "moonbit" }
 
-			-- Prefer git instead of curl in order to improve connectivity in some environments
-			require("nvim-treesitter.install").prefer_git = true
-			---@diagnostic disable-next-line: missing-fields
-			require("nvim-treesitter.configs").setup(opts)
+			treesitter.setup()
+			local treesitter_cli = "/opt/homebrew/bin"
+			if vim.fn.isdirectory(treesitter_cli) == 1 and not vim.env.PATH:find(treesitter_cli, 1, true) then
+				vim.env.PATH = treesitter_cli .. ":" .. vim.env.PATH
+			end
+
+			local can_install = vim.fn.executable("tree-sitter") == 1
+			if can_install then
+				treesitter.install(ensure_installed)
+			end
+
+			-- -- Register the community MoonBit parser (not bundled with nvim-treesitter)
+			-- local parser_config = require("nvim-treesitter.parsers").get_parser_configs()
+			-- parser_config.moonbit = {
+			-- 	install_info = {
+			-- 		url = vim.fn.stdpath("data") .. "/lazy/tree-sitter-moonbit",
+			-- 		files = { "src/parser.c", "src/scanner.c" },
+			-- 	},
+			-- 	filetype = "moonbit",
+			-- }
+
+			local available = {}
+			for _, lang in ipairs(treesitter.get_available()) do
+				available[lang] = true
+			end
+
+			local function treesitter_try_attach(buf, lang, filetype)
+				if not vim.treesitter.language.add(lang) then
+					return
+				end
+
+				vim.treesitter.start(buf, lang)
+
+				-- Match the old nvim-treesitter indent module while preserving Ruby's regex indent rules.
+				if filetype == "ruby" then
+					vim.cmd.syntax("on")
+				elseif vim.treesitter.query.get(lang, "indents") then
+					vim.bo[buf].indentexpr = "v:lua.require'nvim-treesitter'.indentexpr()"
+				end
+			end
+
+			vim.api.nvim_create_autocmd("FileType", {
+				pattern = "*",
+				callback = function(event)
+					local lang = vim.treesitter.language.get_lang(event.match) or event.match
+					if not lang then
+						return
+					end
+
+					if vim.tbl_contains(treesitter.get_installed("parsers"), lang) then
+						treesitter_try_attach(event.buf, lang, event.match)
+					elseif can_install and available[lang] then
+						treesitter.install(lang):await(function()
+							treesitter_try_attach(event.buf, lang, event.match)
+						end)
+					else
+						treesitter_try_attach(event.buf, lang, event.match)
+					end
+				end,
+			})
+
+			-- -- Detect MoonBit filetypes so Tree-sitter attaches automatically
+			-- vim.filetype.add({
+			-- 	extension = {
+			-- 		mbt = "moonbit",
+			-- 		mbti = "moonbit",
+			-- 		mbtp = "moonbit",
+			-- 	},
+			-- })
 
 			-- There are additional nvim-treesitter modules that you can use to interact
 			-- with nvim-treesitter. You should go explore a few and see what interests you:
@@ -902,7 +979,7 @@ require("lazy").setup({
 	require("kickstart.plugins.indent_line"),
 	-- require 'kickstart.plugins.lint',
 	require("kickstart.plugins.autopairs"),
-	require("kickstart.plugins.neo-tree"),
+	-- require("kickstart.plugins.neo-tree"),
 	require("kickstart.plugins.gitsigns"), -- adds gitsigns recommend keymaps
 
 	-- NOTE: The import below can automatically add your own plugins, configuration, etc from `lua/custom/plugins/*.lua`
@@ -934,6 +1011,7 @@ require("lazy").setup({
 })
 
 require("ai")
+require("pi")
 
 -- The line beneath this is called `modeline`. See `:help modeline`
 -- vim: ts=2 sts=2 sw=2 et
